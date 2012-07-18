@@ -467,9 +467,9 @@ escape(C)   -> C.
 encode(Val) ->
     encode(Val, false).
 encode(Val, false) when Val == undefined; Val == null ->
-    "null";
+    "NULL";
 encode(Val, true) when Val == undefined; Val == null ->
-    <<"null">>;
+    <<"NULL">>;
 encode(Val, false) when is_binary(Val) ->
     binary_to_list(quote(Val));
 encode(Val, true) when is_binary(Val) ->
