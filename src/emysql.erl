@@ -146,7 +146,9 @@ update(Tab, Record) when is_atom(Tab)
 	and is_list(Record) ->
 	case proplists:get_value(id, Record) of 
     undefined ->
-        {error, no_id_found};
+		Updates = string:join([encode_column(Col) || Col <- Record], ","),
+		Query = ["update ", atom_to_list(Tab), " set ", Updates, ";"],
+		sqlquery(Query);
     Id ->
         update(Tab, lists:keydelete(id, 1, Record), {id, Id})
 	end.
