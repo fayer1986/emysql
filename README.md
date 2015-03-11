@@ -18,7 +18,7 @@ compile emysql
 
 ## Select API
 
-* emsysql:select(tab).
+* emyssql:select(tab).
 * emysql:select({tab, [col1,col2]}).
 * emysql:select({tab, [col1, col2], {id,1}}).
 * emysql:select(Query, Load).
@@ -29,11 +29,11 @@ compile emysql
 
 ## Insert API
 
-* emsyql:insert(tab, [{Field1, Val}, {Field2, Val2}]).
+* emysql:insert(tab, [{Field1, Val}, {Field2, Val2}]).
 
 ## Delete API
 
-* emsyql:delete(tab, {name, Name}]).
+* emysql:delete(tab, {name, Name}]).
 
 ## Query API
 
