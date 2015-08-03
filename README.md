@@ -18,7 +18,7 @@ compile emysql
 
 ## Select API
 
-* emyssql:select(tab).
+* emysql:select(tab).
 * emysql:select({tab, [col1,col2]}).
 * emysql:select({tab, [col1, col2], {id,1}}).
 * emysql:select(Query, Load).
