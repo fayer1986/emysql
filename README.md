@@ -12,21 +12,21 @@ Erlang MySQL client.
 ### Select
 
 * emysql:select(tab).
-* emysql:select({tab, [col1,col2]}).
+* emysql:select({tab, [col1, col2]}).
 * emysql:select({tab, [col1, col2], {id,1}}).
 * emysql:select(Query, Load).
 
 ### Update
 
-* emysql:update(tab, [{Field1, Val}, {Field2, Val2}], {id, 1}).
+* emysql:update(tab, [{field1, Val}, {field2, Val2}], {id, 1}).
 
 ### Insert
 
-* emysql:insert(tab, [{Field1, Val}, {Field2, Val2}]).
+* emysql:insert(tab, [{field1, Val}, {field2, Val2}]).
 
 ### Delete
 
-* emysql:delete(tab, {name, Name}]).
+* emysql:delete(tab, {field, Val}]).
 
 ### Raw Query
 
