@@ -1,45 +1,38 @@
-# eMySQL
 
-Erlang MySQL client
+# emysql
+
+Erlang MySQL client.
 
 ## Compile with Rebar
 
-compile rebar:
+* rebar compile
 
-* git clone https://github.com/basho/rebar
-* cd rebar
-* ./bootstrap
+## API
 
-compile emysql
-
-* cp rebar emysql/
-* cd emysql
-* ./rebar compile
-
-## Select API
+### Select
 
 * emysql:select(tab).
 * emysql:select({tab, [col1,col2]}).
 * emysql:select({tab, [col1, col2], {id,1}}).
 * emysql:select(Query, Load).
 
-## Update API
+### Update
 
 * emysql:update(tab, [{Field1, Val}, {Field2, Val2}], {id, 1}).
 
-## Insert API
+### Insert
 
 * emysql:insert(tab, [{Field1, Val}, {Field2, Val2}]).
 
-## Delete API
+### Delete
 
 * emysql:delete(tab, {name, Name}]).
 
-## Query API
+### Raw Query
 
 * emysql:sqlquery("select * from tab;").
 
-## Prepare API
+### Prepare
 
 * emysql:prepare(find_with_id, "select * from tab where id = ?;").
 * emysql:execute(find_with_id, [Id]).
@@ -48,3 +41,8 @@ compile emysql
 ## MySQL Client Protocal
 
 * http://forge.mysql.com/wiki/MySQL_Internals_ClientServer_Protocol
+
+## Author
+
+Feng Lee <feng@emqtt.io>
+
