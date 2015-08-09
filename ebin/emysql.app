@@ -1,6 +1,6 @@
 {application,emysql,
-             [{description,"emysql"},
-              {vsn,"3.0.1"},
+             [{description,"Erlang MySQL Client"},
+              {vsn,"4.0"},
               {modules,[emysql,emysql_app,emysql_auth,emysql_conn,emysql_recv,
                         emysql_sup,gen_server2,priority_queue]},
               {registered,[]},
