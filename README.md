@@ -5,21 +5,19 @@ Erlang MySQL client.
 
 ## Compile with Rebar
 
-* rebar compile
+    rebar compile
 
 ## App Config
 
-```
-{emysql, [
-    {pool, 4},
-    {host, "localhost"},
-    {port, 3306},
-    {username, ""},
-    {password, ""},
-    {database, "db"},
-    {encoding, utf8}
-]}
-```
+    {emysql, [
+        {pool, 4},
+        {host, "localhost"},
+        {port, 3306},
+        {username, ""},
+        {password, ""},
+        {database, "db"},
+        {encoding, utf8}
+    ]}
 
 ## API
 
