@@ -6,8 +6,9 @@
 %%% Updated : 11 Jan 2010 
 %%% License : http://www.opengoss.com
 %%%
-%%% Copyright (C) 2007-2010, www.opengoss.com 
+%%% Copyright (C) 2007-2010, www.opengoss.com
 %%%----------------------------------------------------------------------
+
 -module(emysql_app).
 
 -author('ery.lee@gmail.com').

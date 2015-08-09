@@ -20,6 +20,7 @@
 start_link(Opts) ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, Opts).  
 
+%% TODO: not right...
 init(Opts) ->
     PoolSize = proplists:get_value(pool_size, Opts, 4),
     {ok, {{one_for_one, 10, 10},
@@ -29,4 +30,4 @@ init(Opts) ->
 			worker, [emysql_conn, emysql_recv]} || I <- lists:seq(1, PoolSize)]]
 		}
 	}.
-	
+

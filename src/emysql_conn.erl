@@ -6,6 +6,7 @@
 %%%
 %%% Copyright (C) 2012, www.opengoss.com 
 %%%----------------------------------------------------------------------
+
 -module(emysql_conn).
 
 -include("emysql.hrl").

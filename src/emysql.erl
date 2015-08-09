@@ -7,6 +7,7 @@
 %%%
 %%% Copyright (C) 2012, www.opengoss.com 
 %%%----------------------------------------------------------------------
+
 -module(emysql).
 
 -author('ery.lee@gmail.com').
@@ -22,49 +23,31 @@
 -endif.
 
 %command functions
--export([info/0,
-		pool/1,
-		conns/0]).
+-export([info/0, pool/1, conns/0]).
 
 %sql functions
--export([insert/2,
-		insert/3,
-        select/1,
-        select/2,
-		select/3,
-        update/2,
-        update/3,
-        delete/1,
-        delete/2,
-		truncate/1,
+-export([insert/2, insert/3,
+        select/1, select/2, select/3,
+        update/2, update/3,
+        delete/1, delete/2,
+		truncate/1, 
         prepare/2,
-        execute/1,
-        execute/2,
+        execute/1, execute/2,
         unprepare/1,
-        sqlquery/1,
-		sqlquery/2]).
+        sqlquery/1, sqlquery/2]).
 
--behavior(gen_server2).
+-behavior(gen_server).
 
--export([init/1,
-		prioritise_call/3,
-        handle_call/3,
-		prioritise_cast/2,
-        handle_cast/2,
-        handle_info/2,
-        terminate/2,
-        code_change/3]).
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2,
+         terminate/2, code_change/3]).
 
 -record(state, {ids}).
 
 %% External exports
--export([encode/1,
-	    encode/2,
-        escape/1,
-	    escape_like/1]).
+-export([encode/1, encode/2, escape/1, escape_like/1]).
 
 start_link(PoolSize) ->
-	gen_server2:start_link({local, ?MODULE}, ?MODULE, [PoolSize], []).
+	gen_server:start_link({local, ?MODULE}, ?MODULE, [PoolSize], []).
 
 info() ->
 	[emysql_conn:info(Pid) || Pid <- 
@@ -72,10 +55,10 @@ info() ->
 
 %pool pool
 pool(Id) ->
-	gen_server2:cast(?MODULE, {pool, Id}).
+	gen_server:cast(?MODULE, {pool, Id}).
 
 conns() ->
-	gen_server2:call(?MODULE, conns).
+	gen_server:call(?MODULE, conns).
 
 insert(Tab, Record) when is_atom(Tab) ->
 	sqlquery(encode_insert(Tab, Record)).
@@ -228,11 +211,11 @@ with_next_conn(Fun, _Load) ->
 	
 
 %with_next_conn(Fun, Load) ->
-%	Conn = gen_server2:call(?MODULE, {next_conn, Load}),
+%	Conn = gen_server:call(?MODULE, {next_conn, Load}),
 %	case Conn of	
 %	{Id, Pid} -> 
 %		Result = Fun(Pid),
-%		gen_server2:cast(?MODULE, {done, Id, Load}),
+%		gen_server:cast(?MODULE, {done, Id, Load}),
 %		Result;
 %	undefined -> 
 %		{error, no_mysql_conn}
@@ -263,14 +246,6 @@ init([PoolSize]) ->
 %%                                      {stop, Reason, State}
 %% Description: Handling call messages
 %%--------------------------------------------------------------------
-prioritise_call(info, _From, _State) ->
-	10;
-prioritise_call(conns, _From, _State) ->
-	10;
-prioritise_call({next_conn, _Load}, _From, _State) ->
-	8;
-prioritise_call(_Req, _From, _State) ->
-	0.
 
 handle_call(info, _From, State) ->
 	Reply = [{conn, Id, Pid, get(Id), get({total, Id})} 
@@ -313,13 +288,6 @@ handle_call(Req, From, State) ->
 %%                                      {stop, Reason, State}
 %% Description: Handling cast messages
 %%--------------------------------------------------------------------
-prioritise_cast({pool, _Id}, _State) ->
-	10;
-prioritise_cast({done, _ConnId, _Load}, _State) ->
-	2;
-prioritise_cast(_Msg, _State) ->
-	0.
-
 handle_cast({pool, Id}, State) ->
 	put(Id, 0),
 	put({total, Id}, 0),
