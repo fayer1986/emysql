@@ -1,2 +1,15 @@
-%% MySQL result record:
--record(mysql_result, {fieldinfo = [], rows = [], affectedrows = 0, insert_id =0, error = ""}).
+%%--------------------------------------------------------------------
+%% MySQL Result
+%%--------------------------------------------------------------------
+
+-record(mysql_field, {table, name, length, type}).
+
+-record(mysql_result, {
+        fields    = [],
+        rows      = [],
+        affected  = 0,
+        insert_id = 0,
+        error}).
+
+-record(mysql_error, {code, message}).
+
