@@ -54,8 +54,8 @@ make_auth(Username, Password) when is_binary(Username), is_binary(Password) ->
     <<Caps:16/little, 0:24/little, Username/binary, 0:8, Password/binary>>.
 
 %% part of do_new_auth/4, which is part of mysql_init/4
--spec make_new_auth(binary(), binary(), binary()) -> binary().
-make_new_auth(Username, Password, Database) when is_binary(Username),is_binary(Password), is_binary(Database) ->
+-spec make_new_auth(binary(), binary(), binary() | undefined) -> binary().
+make_new_auth(Username, Password, Database) when is_binary(Username),is_binary(Password) ->
     DBCaps = case Database of
         undefined -> 0;
         _         -> ?CONNECT_WITH_DB
@@ -71,8 +71,8 @@ make_new_auth(Username, Password, Database) when is_binary(Username),is_binary(P
     <<Caps:32/little, Maxsize:32/little, 8:8, 0:23/integer-unit:8,
       Username/binary, 0:8, PassLen:8, Password/binary, DatabaseB/binary>>.
 
-hash(S) ->
-    hash(S, 1345345333, 305419889, 7).
+hash(S) when is_binary(S) ->
+    hash(binary_to_list(S), 1345345333, 305419889, 7).
 
 hash([C | S], N1, N2, Add) ->
     N1_1 = N1 bxor (((N1 band 63) + Add) * C + N1 * 256),

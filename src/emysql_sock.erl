@@ -209,7 +209,7 @@ parse_received_data(ClientPid, Data, ParserFun) ->
         {more, NewParserFun} ->
             {ok, NewParserFun};
         {ok, Packet, Rest} ->
-            ClientPid ! {mysql_recv, self(), {data, Packet}},
+            ClientPid ! {mysql_recv, self(), packet, Packet},
             parse_received_data(ClientPid, Rest, emysql_packet:parser());
         {error, Error} ->
             {error, Error}

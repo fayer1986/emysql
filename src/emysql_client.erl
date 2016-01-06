@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% Copyright (c) 2016 eMQTT.IO, All Rights Reserved.
+%%% Copyright (c) 2015-2016 eMQTT.IO, All Rights Reserved.
 %%%
 %%% Permission is hereby granted, free of charge, to any person obtaining a copy
 %%% of this software and associated documentation files (the "Software"), to deal
@@ -39,6 +39,10 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
+-ifdef(TEST).
+-compile(export_all).
+-endif.
+
 -type host() :: inet:ip_address() | inet:hostname() | string().
 
 -type option() :: {host, host()}
@@ -54,7 +58,7 @@
 
 -export_type([option/0]).
 
--define(TIMEOUT, 300000).
+-define(TIMEOUT, 600000).
 
 -record(state, {host      = "localhost" :: host(),
                 port      = 3306        :: inet:port_number(),
@@ -72,58 +76,74 @@
                 timeout   = ?TIMEOUT    :: pos_integer(),
                 logger                  :: gen_logger:logmod()}).
 
+-type query_result() :: {updated, mysql_result()}
+                      | {data, mysql_result()}
+                      | {error, any()}.
+
 %%%=============================================================================
 %%% API Functions
 %%%=============================================================================
 
+%% @doc Connect to MySQL.
 -spec connect([option()]) -> {ok, pid()} | {error, any()}.
 connect(Opts) ->
     gen_server:start_link(?MODULE, [Opts], []).
 
+%% @doc SQL Query
+-spec query(pid(), binary()) -> query_result().
 query(C, Sql) when is_binary(Sql) ->
-    query(C, Sql, ?TIMEOUT).
+    call(C, {query, Sql}).
 
+-spec query(pid(), binary(), timeout()) -> query_result().
 query(C, Sql, Timeout) when is_binary(Sql) ->
     call(C, {query, Sql}, Timeout).
 
+%% @doc Prepare
+-spec prepare(pid(), binary(), binary()) -> query_result().
 prepare(C, Name, Stmt) when is_binary(Name), is_binary(Stmt) ->
     call(C, {prepare, Name, Stmt}).
 
+%% @doc Execute
+-spec execute(pid(), binary(), binary()) -> query_result().
 execute(C, Name, Params) when is_binary(Name) ->
-    execute(C, Name, Params, ?TIMEOUT).
+    call(C, {execute, Name, Params}).
 
+-spec execute(pid(), binary(), binary(), timeout()) -> query_result().
 execute(C, Name, Params, Timeout) when is_binary(Name) ->
     call(C, {execute, Name, Params}, Timeout).
 
+%% @doc Unprepare
+-spec unprepare(pid(), binary()) -> query_result().
 unprepare(C, Name) when is_binary(Name) ->
     call(C, {unprepare, Name}).
 
+%% @doc Client Info
+-spec info(pid()) -> list().
+info(C) -> call(C, info).
+
+%% @doc Close the client.
+-spec close(pid()) -> ok.
+close(C) -> call(C, close).
+
 call(C, Request) ->
-    gen_server:call(C, Request).
+    gen_server:call(C, Request, infinity).
 
 call(C, Request, Timeout) ->
     gen_server:call(C, Request, Timeout).
-
-info(C) ->
-    gen_server:call(C, info, infinity).
-
-close(C) ->
-    gen_server:call(C, close, infinity).
 
 %%%=============================================================================
 %%% gen_server callbacks
 %%%=============================================================================
 
 init([Opts]) ->
-    case connect_mysql(parse_opt(Opts, #state{})) of
+
+    Logger = gen_logger:new({console, info}),
+
+    case connect_mysql(parse_opt(Opts, #state{logger = Logger})) of
         {ok, Greeting, State} ->
             case auth_mysql(Greeting, State) of
-                {ok, State1} ->
-                    ok = use_database(State1),
-                    ok = set_encoding(State1),
-                    {ok, State1};
-                {error, Error} ->
-                    {stop, Error}
+                {ok, State1}   -> init_mysql(State1);
+                {error, Error} -> {stop, Error}
             end;
         {error, Error} ->
             {stop, Error}
@@ -132,7 +152,7 @@ init([Opts]) ->
 parse_opt([], State) ->
     State;
 parse_opt([{host, Host} | Opts], State) ->
-    parse_opt(Opts, State#state{host = iolist_to_binary(Host)});
+    parse_opt(Opts, State#state{host = Host});
 parse_opt([{port, Port} | Opts], State) when is_integer(Port) ->
     parse_opt(Opts, State#state{port = Port});
 parse_opt([{username, Username} | Opts], State) ->
@@ -177,11 +197,12 @@ handle_call({query, Query}, _From, State) ->
     reply(do_query(Query, State), State);
 
 handle_call({prepare, Name, Stmt}, _From, State) ->
-    Prepare = <<"PREPARE ", Name/binary, " FROM '", Stmt/binary, "'">>,
+    Prepare = <<"PREPARE ", Name/binary, " FROM ",
+                (emysql_type:quote(Stmt))/binary>>,
     reply(do_query(Prepare, State), State);
 
 handle_call({unprepare, Name}, _From, State) ->
-    Unprepare = <<"UNPREPARE ", Name/binary>>,
+    Unprepare = <<"DEALLOCATE PREPARE ", Name/binary>>,
     reply(do_query(Unprepare, State), State);
 
 handle_call({execute, Name, Params}, _From, State) ->
@@ -190,13 +211,13 @@ handle_call({execute, Name, Params}, _From, State) ->
 
 handle_call(Req, _From, State = #state{logger = Logger}) ->
     Logger:error("Unexepcted request: ~p", [Req]),
-    {reply, {error, unexpected_req}, State}.
+    reply({error, unexpected_req}, State).
 
 handle_cast(Msg, State = #state{logger = Logger}) ->
     Logger:error("Unexepcted msg: ~p", [Msg]),
     {noreply, State}.
 
-handle_info({mysql_recv, _Receiver, data, Packet},
+handle_info({mysql_recv, _Receiver, packet, Packet},
             State = #state{logger = Logger}) ->
     Logger:error("Unexpected mysql_recv: ~p", [Packet]),
     {noreply, State};
@@ -248,46 +269,42 @@ auth_mysql(#mysql_greeting{seqnum = Seq, salt1 = Salt1,
     NextSeq = Seq + 1,
     auth_result(
         case emysql_auth:is_secure_passwd(Caps) of
-            true  -> do_new_auth(NextSeq, Salt1, Salt2, State);
-            false -> do_old_auth(NextSeq, Salt1, State)
+            true  -> auth_new(NextSeq, Salt1, Salt2, State);
+            false -> auth_old(NextSeq, Salt1, State)
         end, State).
 
-do_old_auth(Seq, Salt1, State = #state{username = Username, password = Password}) ->
+auth_old(Seq, Salt1, State = #state{username = Username, password = Password}) ->
     Auth = emysql_auth:password_old(Password, Salt1),
     Packet = emysql_auth:make_auth(Username, Auth),
     command(Seq, Packet, State).
 
-do_new_auth(Seq, Salt1, Salt2, State = #state{username = Username, password = Password}) ->
-    Auth = emysql_auth:password_new(Password, Salt1 ++ Salt2),
-    Packet2 = emysql_auth:make_new_auth(Username, Auth, none),
+auth_new(Seq, Salt1, Salt2, State = #state{username = Username, password = Password}) ->
+    Auth = emysql_auth:password_new(Password, <<Salt1/binary, Salt2/binary>>),
+    Packet2 = emysql_auth:make_new_auth(Username, Auth, undefined),
     case command(Seq, Packet2, State) of
+        {ok, SeqNum2, <<254:8>>} ->
+            AuthOld = emysql_auth:password_old(Password, Salt1),
+            command(SeqNum2 + 1, <<AuthOld/binary, 0:8>>, State);
         {ok, SeqNum2, Packet3} ->
-            case Packet3 of
-                <<254:8>> ->
-                    AuthOld = emysql_auth:password_old(Password, Salt1),
-                    command(SeqNum2 + 1, <<AuthOld/binary, 0:8>>, State);
-                _ ->
-                    {ok, SeqNum2, Packet3}
-            end;
+            {ok, SeqNum2, Packet3};
         {error, Reason} ->
             {error, Reason}
     end.
 
-auth_result({ok, {SeqNum, <<0:8, _/binary>>}}, State) ->
+auth_result({ok, SeqNum, <<0:8, _/binary>>}, State) ->
     {ok, State#state{seqnum = SeqNum}};
-auth_result({ok, {_, <<255:8, _Code:16/little, Message/binary>>}}, _) ->
+auth_result({ok, _, <<255:8, _Code:16/little, Message/binary>>}, _) ->
     {error, {auth_failed, Message}};
-auth_result({ok, {_, Packet}}, _State) ->
+auth_result({ok, _, Packet}, _State) ->
     {error, {auth_failed, Packet}};
 auth_result({error, Reason}, _State) ->
     {error, Reason}.
 
-use_database(State = #state{database = DB}) ->
-    do_query(<<"use ", DB/binary>>, State).
-
-set_encoding(State = #state{encoding = Encoding}) ->
-    Bin = list_to_binary(atom_to_list(Encoding)),
-    do_query(<<"set names '", Bin/binary, "'">>, State).
+init_mysql(State = #state{database = Database, encoding = Encoding}) ->
+    EncBin = list_to_binary(atom_to_list(Encoding)),
+    do_queries([<<"use ", Database/binary>>,
+                <<"set names ", (emysql_type:quote(EncBin))/binary>>], State),
+    {ok, State}.
 
 do_queries(Queries, State) ->
     catch lists:foldl(
@@ -298,59 +315,63 @@ do_queries(Queries, State) ->
             end
         end, ok, Queries).
 
-do_query(Query, State) ->
-    Packet = <<?MYSQL_QUERY_OP, Query/binary>>,
-    case send(0, Packet, State) of
-        ok    -> get_query_response(State);
+do_query(Query, State = #state{logger = Logger}) ->
+    Logger:info("[emysql~p] Query: ~s", [self(), Query]),
+    case send(0, <<?MYSQL_QUERY_OP, Query/binary>>, State) of
+        ok    -> recv_response(State);
         Error -> Error
     end.
 
-get_query_response(State) ->
-    case recv(undefined, State) of
-        {ok, _Seq, <<0, Bin/binary>>} ->
-            {updated, emysql_packet:parse_update_result(Bin)};
-        {ok, _Seq, <<255, Rest/binary>>} ->
-            {error, emysql_packet:parse_error(Rest)};
-        {ok, _Seq, _Packet} ->
-		    %% Tabular data received
-		    case get_fields([], State) of
-                {ok, Fields} ->
-                    case get_rows(Fields, [], State) of
-                        {ok, Rows} ->
-                            {data, #mysql_result{fields = Fields, rows = Rows}};
-                        {error, Reason} ->
-                            {error, Reason}
-                        end;
+recv_response(State) ->
+    with_recv(fun handle_response/3, State).
+
+handle_response(_Seq, <<0, Bin/binary>>, _State) ->
+    {updated, emysql_packet:parse_update_result(Bin)};
+handle_response(_Seq, <<255, Rest/binary>>, _State) ->
+    {error, emysql_packet:parse_error(Rest)};
+handle_response(_Seq, _Packet, State) ->
+    %% Tabular data received
+    case recv_fields([], State) of
+        {ok, Fields} ->
+            case recv_rows(Fields, [], State) of
+                {ok, Rows} ->
+                    {data, #mysql_result{fields = Fields, rows = Rows}};
                 {error, Reason} ->
                     {error, Reason}
-            end;
+                end;
         {error, Reason} ->
             {error, Reason}
     end.
 
-%% Support for MySQL 4.0.x:
-get_fields(Fields, State = #state{version = Version}) ->
+recv_fields(Fields, State) ->
+    with_recv(fun handle_fields/4, Fields, State).
+
+handle_fields(_Seq, <<254>>, Fields, _State) ->
+    {ok, lists:reverse(Fields)};
+handle_fields(_Seq, <<254, Rest/binary>>, Fields, _State) when size(Rest) < 8 ->
+    {ok, lists:reverse(Fields)};
+handle_fields(_Seq, Packet, Fields, State = #state{version = Version}) ->
+    Field = emysql_packet:parse_field(Version, Packet),
+    recv_fields([Field | Fields], State).
+
+recv_rows(Fields, Rows, State) ->
+    with_recv(fun handle_rows/4, {Fields, Rows}, State).
+
+handle_rows(_Seq, <<254:8, Rest/binary>>, {_, Rows}, _State) when size(Rest) < 8 ->
+    {ok, lists:reverse(Rows)};
+handle_rows(_Seq, Packet, {Fields, Rows}, State) ->
+    recv_rows(Fields, [emysql_packet:parse_row(Packet, Fields) | Rows], State).
+
+with_recv(Fun, State) ->
     case recv(undefined, State) of
-        {ok, _Seq, <<254>>} ->
-            {ok, lists:reverse(Fields)};
-        {ok, _Seq, <<254, Rest/binary>>} when size(Rest) < 8 ->
-            {ok, lists:reverse(Fields)};
-        {ok, _Seq, Packet} ->
-            Field = emysql_packet:parse_field(Version, Packet),
-            get_fields([Field | Fields], State);
-        {error, Reason} ->
-            {error, Reason}
+        {ok, Seq, Packet} -> Fun(Seq, Packet, State);
+        {error, Reason}   -> {error, Reason}
     end.
 
-get_rows(Fields, Rows, State) ->
+with_recv(Fun, Acc, State) ->
     case recv(undefined, State) of
-        {ok, _Seq, <<254:8, Rest/binary>>} when size(Rest) < 8 ->
-		    {ok, lists:reverse(Rows)};
-        {ok, _Seq, Packet} ->
-		    Row = emysql_packet:parse_row(Packet, Fields),
-		    get_rows(Fields, [Row | Rows], State);
-        {error, Reason} ->
-            {error, Reason}
+        {ok, Seq, Packet} -> Fun(Seq, Packet, Acc, State);
+        {error, Reason}   -> {error, Reason}
     end.
 
 make_statements(Name, []) ->
@@ -376,12 +397,14 @@ command(Seq, Packet, State) ->
         Error -> Error
     end.
 
-send(Seq, Packet, #state{socket = Sock}) ->
-    emysql_sock:send(Sock, emysql_packet:serialize({Seq, Packet})).
+send(Seq, Packet, #state{socket = Sock, logger = Logger}) ->
+    Data = emysql_packet:serialize({Seq, Packet}),
+    Logger:debug("[emysql~p] SEND: ~p", [self(), Data]),
+    emysql_sock:send(Sock, Data).
 
 recv(undefined, #state{receiver = Receiver, timeout = Timeout}) ->
     receive
-    {mysql_recv, Receiver, data, {Seq, Packet}} ->
+    {mysql_recv, Receiver, packet, {Seq, Packet}} ->
         {ok, Seq, Packet}
     after Timeout ->
         {error, mysql_timeout}
@@ -390,7 +413,7 @@ recv(undefined, #state{receiver = Receiver, timeout = Timeout}) ->
 recv(Seq, #state{receiver = Receiver, timeout = Timeout}) when is_integer(Seq) ->
     RecvSeq = Seq + 1,
     receive
-    {mysql_recv, Receiver, data, {RecvSeq , Packet}} ->
+    {mysql_recv, Receiver, packet, {RecvSeq , Packet}} ->
         {ok, RecvSeq, Packet}
     after Timeout ->
         {error, mysql_timeout}

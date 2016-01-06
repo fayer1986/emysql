@@ -28,7 +28,7 @@
 
 -include("emysql_packet.hrl").
 
--export([name/1, value/1, encode/1]).
+-export([name/1, value/1, encode/1, quote/1]).
 
 name(?DECIMAL)     -> 'DECIMAL';
 name(?TINY)        -> 'TINY';

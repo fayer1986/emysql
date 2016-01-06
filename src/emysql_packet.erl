@@ -151,7 +151,7 @@ parse_row(_Bin, [], Cells) ->
 parse_row(Bin, [Field | Fields], Cells) ->
     {Col, Rest} = parse_string(Bin),
     Cell = parse_cell(Field, Col),
-    parse_row(Fields, Rest, [Cell | Cells]).
+    parse_row(Rest, Fields, [Cell | Cells]).
 
 parse_cell(_Field, null) ->
     null;
