@@ -1,60 +1,17 @@
 
-# emysql
+# emysql - Erlang MySQL Driver
 
-Erlang MySQL client.
+For I cannot find a mature, stable and well-designed mysql driver, for example [Emysql](https://github.com/Eonblast/Emysql/) project will not be maintained, I spent one week rewriting the old driver used in my opengoss product years ago.
 
-## Compile with Rebar
+After I finished the coding of this library, I found there has been an awesome mysql driver available: [mysql-otp](https://github.com/mysql-otp/mysql-otp). The design of mysql-otp driver is elegant and OTP-compatible, it follows the principles of driver design that socket, protocol and pool should be separated.
 
-    rebar compile
+Finally, I decide to deprecate my emysql driver and contribute to [mysql-otp](https://github.com/mysql-otp/mysql-otp) project.
 
-## App Config
 
-    {emysql, [
-        {pool, 4},
-        {host, "localhost"},
-        {port, 3306},
-        {username, ""},
-        {password, ""},
-        {database, "db"},
-        {encoding, utf8}
-    ]}
-
-## API
-
-### Select
-
-* emysql:select(tab).
-* emysql:select({tab, [col1, col2]}).
-* emysql:select({tab, [col1, col2], {id,1}}).
-* emysql:select(Query, Load).
-
-### Update
-
-* emysql:update(tab, [{field1, Val}, {field2, Val2}], {id, 1}).
-
-### Insert
-
-* emysql:insert(tab, [{field1, Val}, {field2, Val2}]).
-
-### Delete
-
-* emysql:delete(tab, {field, Val}]).
-
-### Raw Query
-
-* emysql:sqlquery("select * from tab;").
-
-### Prepare
-
-* emysql:prepare(find_with_id, "select * from tab where id = ?;").
-* emysql:execute(find_with_id, [Id]).
-* emysql:unprepare(find_with_id).
-
-## MySQL Client Protocal
+## MySQL Client Protocol
 
 * http://forge.mysql.com/wiki/MySQL_Internals_ClientServer_Protocol
 
 ## Author
 
 Feng Lee <feng@emqtt.io>
-
