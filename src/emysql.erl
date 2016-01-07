@@ -37,7 +37,9 @@
 
 -type sql() :: string() | iodata().
 
--type result() :: {ok, updated, {}} | {ok, data, {list(), list()}} | {error, any()}.
+-type result() :: {ok, updated, {non_neg_integer(), non_neg_integer()}}
+                | {ok, data, {Columns :: list(), Rows :: list()}}
+                | {error, any()}.
 
 %% @doc Connect to MySQL Database.
 -spec connect([emysql_client:option()]) -> {ok, client()} | {error, any()}.
